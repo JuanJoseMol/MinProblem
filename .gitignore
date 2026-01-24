@@ -1,0 +1,8 @@
+# Ignore everything
+*
+
+# Allow files in the root directory
+!/*
+
+# But ignore all directories (subfolders)
+*/
