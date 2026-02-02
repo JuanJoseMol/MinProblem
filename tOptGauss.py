@@ -105,9 +105,9 @@ def load_function(tipo2, ej):
         img = np.array(img, dtype = 'float32')
 
     if ej == "fitting":
-        img = np.load('../data/data_div2k.npz')
-        img = img['test_data'][2]
-        img = np.array(img, dtype = 'float32')
+        img = Image.open("../data/playa0823.png").convert("RGB") 
+        img = downsample_antialiased(img, factor=2)
+        img = np.array(img)/255.0
 
     if ej == "fitting2":
         img = Image.open("../data/loros23.png").convert("RGB") 
@@ -427,35 +427,35 @@ if __name__ == "__main__":
     """
     ####################################### sigma find realistic #######################################
     
-    slides = 11
-    it = 11
+    slides = 21
+    it = 21
     lr = 0.1
               
     tipo2 = "realistic"
-    path = "fitting"
+    path = "noise"
     path2 = path
     ej = path
     times = np.linspace(0, it, slides)
     initial_guess = [20]  # Initial guess for the parameter
     print (path)
     if ej == "fitting":
-      sigma = 84 #optuna
+      sigma = 79 #optuna
     elif ej == "super":
       sigma = 42 #optuna
     elif ej == "noise":
-      sigma = 78 #optuna
+      sigma = 39 #optuna
     if ej == "fitting2":
       sigma = 44
     if ej == "super2":
       sigma = 46
     if ej == "noise2":
-      sigma = 38
+      sigma = 28
     if ej == "fitting3":
       sigma =67
     if ej == "super3":
       sigma = 70
     if ej == "noise3":
-      sigma = 49#/(2*np.pi)
+      sigma = 28#/(2*np.pi)
 
     result = optimize_parameter(slides, tipo2, path, path2, sigma, times, initial_guess)
     best = np.array(result.x[0])
@@ -465,7 +465,8 @@ if __name__ == "__main__":
     
     #target, ft, u, x, y, z = load_and_preprocess(tipo2, path, path2, slides, sigma)
 
-    _, img = load_image(ej)
+    img, _ = load_image(ej)
+    #_, img = load_image(ej)
     img = np.array(img)
     #img = Image.open("../data/0563.png").convert("RGB") 
     #img = downsample_antialiased(img, factor=2)
@@ -480,7 +481,7 @@ if __name__ == "__main__":
 
     x = np.linspace(-int(Nx/4), int(Nx/4), Nx)
     y = np.linspace(-int(Ny/4), int(Ny/4), Ny)
-    for it in [it,1000,5000,10000,50000]:
+    for it in [it,500,1000,2000,5000,10000,50000]:
       sigma_initial = 30
       result = minimize(deviationhuman, sigma_initial, args=(x, y, best*it, ft), bounds=[(0.001, 10000)])
 

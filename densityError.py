@@ -46,7 +46,7 @@ def compute_rho_from_g(g, T, area):
 
 
 def l2_error(rho_hat, rho_ref):
-    return np.sqrt(np.mean((rho_hat - rho_ref) ** 2))
+    return np.sqrt(np.mean((rho_hat - rho_ref) ** 2))/np.sqrt(np.mean(rho_ref ** 2))
 
 def l1_error(rho_hat, rho_ref):
     return np.mean(np.abs(rho_hat - rho_ref) )
@@ -199,7 +199,7 @@ def finite_sample_errors(rho_list, rho_ref, N_values, reps=10, seed=0):
         for _ in range(reps):
             idx = rng.choice(len(rho_array), N, replace=False)
             rho_hat = rho_array[idx].mean(axis=0)
-            vals.append(l1_error(rho_hat, rho_ref))
+            vals.append(l2_error(rho_hat, rho_ref))
         errors[N] = (np.mean(vals), np.std(vals))
         if rho_list[-1].shape == rho_ref_brain.shape:
             print ("Saving brain rho_hat")
@@ -235,7 +235,7 @@ errors_human = finite_sample_errors(human_rhos, rho_ref_human, N_values)
 # 6. Export LaTeX table
 # ============================================================
 
-with open("results2/density_L1_error.tex", "w") as f:
+with open("results2/density_relativeL2_error.tex", "w") as f:
     f.write("\\begin{table}[t]\n")
     f.write("\\centering\n")
     f.write("\\caption{Finite-sample $L^2$ error of optimal density estimation.}\n")
@@ -246,9 +246,9 @@ with open("results2/density_L1_error.tex", "w") as f:
     f.write("\\midrule\n")
 
     for N in N_values:
-        b = errors_brain[N]*4
-        d = errors_3d[N]*8
-        h = errors_human[N]*4
+        b = errors_brain[N]
+        d = errors_3d[N]
+        h = errors_human[N]
         f.write(
             f"{N} & "
             f"${b[0]:.3f} \\pm {b[1]:.4f}$ & "

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Nombre del trabajo
-#SBATCH --job-name=FFnoiseF9
-#SBATCH --output=31ene-FFnoiseF9.txt
+#SBATCH --job-name=fitTrue
+#SBATCH --output=30ene-fitTrue.txt
 # Partici n (Cola de trabajo)
 #SBATCH --partition=gpus
 # Solicitud de gpus
@@ -15,5 +15,5 @@ eval "$(conda shell.bash hook)"
 conda activate jaxtfv1
 module load cuda/12.9
 
-python findSearch.py --obj multiFFadam --ej ouroptuna --save yes
+python tunaSearch.py --mode FFadam --ej fit
 

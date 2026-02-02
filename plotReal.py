@@ -13,6 +13,19 @@ import jax
 from jax.nn import relu
 import matplotlib.patches as patches
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
+import matplotlib.font_manager as fm
+import matplotlib
+
+fm.fontManager.addfont('../../../dataset/Helvetica Neue Bold.ttf')
+matplotlib.rc('font', family='Helvetica Neue')
+
+
+plt.rcParams['font.size'] = 19
+plt.rcParams['font.weight'] ='bold'
+plt.rcParams['axes.labelweight'] = 'bold'
+plt.rcParams['axes.titleweight'] = 'bold'
+plt.rcParams['axes.titlesize'] = 19
+
 
 def ssim(gt, pred):
     H, W = gt.shape[:2]
@@ -179,6 +192,7 @@ def plot_image_with_zoom(
     ax,
     img,
     roi_x, roi_y, roi_w, roi_h,
+    v,
     gt=None,
     show_metrics=False,
 ):
@@ -187,7 +201,7 @@ def plot_image_with_zoom(
     Optionally compute and display PSNR / SSIM.
     """
     ax.imshow(img)
-    ax.set_aspect("equal", adjustable="box")
+    ax.set_aspect("auto")#"equal", adjustable="box")
     ax.axis("off")
 
     # ---- Red ROI rectangle ----
@@ -202,13 +216,26 @@ def plot_image_with_zoom(
     ax.add_patch(rect)
 
     # ---- Zoom inset (flush bottom-right) ----
-    axins = inset_axes(
-        ax,
-        width="38%",
-        height="38%",
-        loc="lower right",
-        borderpad=0,
-    )
+    if v=="" or v=="3":
+        axins = inset_axes(
+            ax,
+            width="38%",
+            height="38%",
+            bbox_to_anchor=(0.047, 0, 1, 1),
+            bbox_transform=ax.transAxes,
+            loc="lower right",
+            borderpad=0,
+        )
+    else:
+        axins = inset_axes(
+            ax,
+            width="38%",
+            height="38%",
+            bbox_to_anchor=(-0.005, -0.04, 1, 1),
+            bbox_transform=ax.transAxes,
+            loc="lower right",
+            borderpad=0,
+        )
 
     zoom = img[roi_y:roi_y + roi_h, roi_x:roi_x + roi_w]
     axins.imshow(zoom)
@@ -220,13 +247,15 @@ def plot_image_with_zoom(
     if show_metrics and gt is not None:
         psnr, ssim = compute_metrics(gt, img)
         ax.text(
-            0.02, 0.95,
-            f"PSNR: {psnr:.2f}\nSSIM: {ssim:.4f}",
-            transform=ax.transAxes,
-            va="top", ha="left",
-            color="white", fontsize=10,
-            bbox=dict(facecolor="black", alpha=0.6, pad=3),
-        )
+                0.01, 0.98,
+                f"PSNR: {psnr:.2f}\nSSIM: {ssim:.4f}",
+                transform=ax.transAxes,
+                va="top",
+                ha="left",
+                color="white",
+                fontsize=10,
+                bbox=dict(facecolor="black", alpha=0.6, pad=2),
+            )
 
 
 """
@@ -421,9 +450,24 @@ def build_filename(model, mode, long, lr, param, value, version="", k=1):
     param   ∈ {"s", "a", "w"}   (sigma, alpha, omega)
     version ∈ {"", "2", "3"}
     """
-    return (
-        f"realistic/{model}_adam{mode}_{long}--lr{lr}-{param}{value}-k{k}.pickle"
-    )
+    if mode in {"noise", "noise2", "noise3"}:
+        if model == "SIREN" and mode == "noise":
+            return (f"realistic/4{model}_adam{mode}_3000--lr0.0005-{param}{value}-k{k}.pickle")
+        else:
+            return (f"realistic/3{model}_adam{mode}_3000--lr{lr}-{param}{value}-k{k}.pickle")
+    elif mode == "fitting":
+        return (f"realistic/2{model}_adam{mode}_{long}--lr{lr}-{param}{value}-k{k}.pickle")
+    else:
+        return (f"realistic/{model}_adam{mode}_{long}--lr{lr}-{param}{value}-k{k}.pickle")
+        """
+        if model == "Gauss" or model == "WIRE":
+            return (f"realistic/{model}_adam{mode}_{long}--lr{lr}-{param}{value}-k{k}.pickle")
+        if model == "SIREN":
+            if mode == "super" or mode == "super2" or mode == "super3":
+                return (f"realistic/{model}_adam{mode}_{long}--lr{lr}-{param}{value}-k{k}.pickle")
+            else:
+                return (f"realistic/2{model}_adam{mode}_{long}--lr{lr}-{param}{value}-k{k}.pickle")
+        """
 
 def load_model_case(model, mode, long=50000, lr=0.001, version="", k=1):
     if model == "WIRE":
@@ -448,47 +492,89 @@ def load_model_case(model, mode, long=50000, lr=0.001, version="", k=1):
     )
     return load_pickle_pred(fname)
 
+"""
 
-v = ""
+v = "3"
 long = 50000
-long2 = 500
+time = 4
 
-img_noise, img_noise_gt = load_image(f"noise{v}")
+
 img_super, img_super_gt = load_image(f"super{v}")
-img_fit,   img_fit_gt   = load_image(f"fitting{v}")
-#new2ourFFadamsuper2_50000--lr0.001-s114-k1.pickle
 
 if v == "":
-    dic_fit   = load_pickle_pred(f"realistic/new2ourFFadamfitting{v}_{long}--lr0.001-s112-k1.pickle")
-    dic_super = load_pickle_pred(f"realistic/new2ourFFadamsuper{v}_{long}--lr0.001-s110-k1.pickle")
-    dic_noise = load_pickle_pred(f"realistic/new2adamFFadamnoise{v}_{long2}--lr0.001-s137-k1.pickle")#73
+    f = 18
+    img_fit,   img_fit_gt   = load_image(f"fitting{v}")
+    img_noise, img_noise_gt = load_image(f"noise3")
+    dic_fit   = load_pickle_pred(f"realistic/2new2ourFFadamfitting_{long}--lr0.001-s152-k1.pickle")
+    dic_super = load_pickle_pred(f"realistic/new2ourFFadamsuper_{long}--lr0.001-s110-k1.pickle")
+    #new2ourFFadamsuper_{long}--lr0.001-s110-k1.pickle")
+    #2newourFFadamsuper_50000--lr0.001-s113-k1.pickle")
+    
+    dic_noise = load_pickle_pred(f"realistic/3newnoiseFFadamnoise3_3000--lr0.001-s29-k1.pickle")##46
 if v == "2":
-    dic_fit   = load_pickle_pred(f"realistic/new2ourFFadamfitting{v}_{long}--lr0.001-s97-k1.pickle")
-    dic_super = load_pickle_pred(f"realistic/new2ourFFadamsuper{v}_{long}--lr0.001-s114-k1.pickle")
-    dic_noise = load_pickle_pred(f"realistic/new2adamFFadamnoise{v}_{long2}--lr0.001-s89-k1.pickle")#44
+    f = 15
+    img_fit,   img_fit_gt   = load_image(f"fitting3")
+    img_noise, img_noise_gt = load_image(f"noise{v}")
+    dic_fit   = load_pickle_pred(f"realistic/new2ourFFadamfitting3_{long}--lr0.001-s119-k1.pickle")
+    dic_super = load_pickle_pred(f"realistic/new2ourFFadamsuper2_{long}--lr0.001-s114-k1.pickle")
+    dic_noise = load_pickle_pred(f"realistic/3newnoiseFFadamnoise2_3000--lr0.001-s28-k1.pickle")#44
+    #new2ourFFadamsuper2_{long}--lr0.001-s114-k1.pickle")
+    #2newourFFadamsuper2_50000--lr0.001-s114-k1.pickle")
 if v == "3":
-    dic_fit   = load_pickle_pred(f"realistic/new2ourFFadamfitting{v}_{long}--lr0.001-s119-k1.pickle")
-    dic_super = load_pickle_pred(f"realistic/new2ourFFadamsuper{v}_{long}--lr0.001-s155-k1.pickle")
-    dic_noise = load_pickle_pred(f"realistic/new2adamFFadamnoise{v}_{long2}--lr0.001-s91-k1.pickle")##46
-dic_fit_SIREN   = load_model_case("SIREN", f"fitting{v}")
+    f = 18
+    img_fit,   img_fit_gt   = load_image(f"fitting2")
+    img_noise, img_noise_gt = load_image(f"noise")
+    dic_fit   = load_pickle_pred(f"realistic/new2ourFFadamfitting2_{long}--lr0.001-s97-k1.pickle")
+    dic_super = load_pickle_pred(f"realistic/new2ourFFadamsuper3_{long}--lr0.001-s155-k1.pickle")
+    dic_noise = load_pickle_pred(f"realistic/3newnoiseFFadamnoise_3000--lr0.001-s35-k1.pickle")#73
+    
+    #new2ourFFadamsuper3_{long}--lr0.001-s155-k1.pickle")
+    #2newourFFadamsuper3_50000--lr0.001-s155-k1.pickle")
+
+if v == "2":
+    dic_fit_SIREN   = load_model_case("SIREN", f"fitting3")
+    dic_fit_GAUSS   = load_model_case("Gauss", f"fitting3")
+    dic_fit_WIRE   = load_model_case("WIRE",  f"fitting3")
+    dic_noise_SIREN = load_model_case("SIREN", f"noise2")
+    dic_noise_GAUSS = load_model_case("Gauss", f"noise2")
+    dic_noise_WIRE = load_model_case("WIRE",  f"noise2")
+if v == "3":
+    dic_fit_SIREN   = load_model_case("SIREN", f"fitting2")
+    dic_fit_GAUSS   = load_model_case("Gauss", f"fitting2")
+    dic_fit_WIRE   = load_model_case("WIRE",  f"fitting2")
+    dic_noise_SIREN = load_model_case("SIREN", f"noise")
+    dic_noise_GAUSS = load_model_case("Gauss", f"noise")
+    dic_noise_WIRE = load_model_case("WIRE",  f"noise")
+if v == "":
+    dic_fit_SIREN   = load_model_case("SIREN", f"fitting")
+    dic_fit_GAUSS   = load_model_case("Gauss", f"fitting")
+    dic_fit_WIRE   = load_model_case("WIRE",  f"fitting")
+    dic_noise_SIREN = load_model_case("SIREN", f"noise3")
+    dic_noise_GAUSS = load_model_case("Gauss", f"noise3")
+    dic_noise_WIRE = load_model_case("WIRE",  f"noise3")
+
 dic_super_SIREN = load_model_case("SIREN", f"super{v}")
-dic_noise_SIREN = load_model_case("SIREN", f"noise{v}", long=long2)
-dic_fit_GAUSS   = load_model_case("Gauss", f"fitting{v}")
 dic_super_GAUSS = load_model_case("Gauss", f"super{v}")
-dic_noise_GAUSS = load_model_case("Gauss", f"noise{v}", long=long2)
-dic_fit_WIRE   = load_model_case("WIRE",  f"fitting{v}")
 dic_super_WIRE = load_model_case("WIRE",  f"super{v}")
-dic_noise_WIRE = load_model_case("WIRE",  f"noise{v}", long=long2)
 
 
-pred1 = dic_fit["pred"].reshape(img_fit_gt.shape)
-pred3 = dic_noise["pred"].reshape(img_noise_gt.shape)
-pred1siren = dic_fit_SIREN["pred"].reshape(img_fit_gt.shape)
-pred3siren = dic_noise_SIREN["pred"].reshape(img_noise_gt.shape)
-pred1gaus = dic_fit_GAUSS["pred"].reshape(img_fit_gt.shape)
-pred3gaus = dic_noise_GAUSS["pred"].reshape(img_noise_gt.shape)
-pred1wire = dic_fit_WIRE["pred"].reshape(img_fit_gt.shape)
-pred3wire = dic_noise_WIRE["pred"].reshape(img_noise_gt.shape)
+print ("asdasd",len(dic_super["param"]),len(dic_super_SIREN["param"]))
+
+if v == "":
+    pred1 = dic_fit["pred"][-1].reshape(img_fit_gt.shape)
+    pred1siren = dic_fit_SIREN["pred"][-1].reshape(img_fit_gt.shape)
+    pred1gaus = dic_fit_GAUSS["pred"][-1].reshape(img_fit_gt.shape)
+    pred1wire = dic_fit_WIRE["pred"][-1].reshape(img_fit_gt.shape)
+else:
+    pred1 = dic_fit["pred"].reshape(img_fit_gt.shape)
+    pred1siren = dic_fit_SIREN["pred"].reshape(img_fit_gt.shape)
+    pred1gaus = dic_fit_GAUSS["pred"].reshape(img_fit_gt.shape)
+    pred1wire = dic_fit_WIRE["pred"].reshape(img_fit_gt.shape)
+
+pred3siren = dic_noise_SIREN["pred"][time].reshape(img_noise_gt.shape)
+pred3 = dic_noise["pred"][time].reshape(img_noise_gt.shape)
+pred3gaus = dic_noise_GAUSS["pred"][time].reshape(img_noise_gt.shape)
+pred3wire = dic_noise_WIRE["pred"][time].reshape(img_noise_gt.shape)
 
 H2, W2, _ = img_super_gt.shape
 params_super = dic_super["param"]
@@ -499,6 +585,10 @@ params_super_gauss = dic_super_GAUSS["param"]
 pred2gaus = eval_gauss_image(params_super_gauss, H2, W2)
 params_super_wire = dic_super_WIRE["param"]
 pred2wire = eval_wire_image(params_super_wire, H2, W2)
+
+print (img_fit_gt.shape, pred1.shape, pred1siren.shape, pred1gaus.shape, pred1wire.shape)
+print (img_super_gt.shape, pred2.shape, pred2siren.shape, pred2gaus.shape, pred2wire.shape)
+print (img_noise_gt.shape, pred3.shape, pred3siren.shape, pred3gaus.shape, pred3wire.shape)
 
 pred1  = np.clip(pred1,  0.0, 1.0)
 pred2  = np.clip(pred2,  0.0, 1.0)
@@ -515,9 +605,9 @@ pred3wire = np.clip(pred3wire, 0.0, 1.0)
 
 images_gt    = [img_fit_gt, img_super_gt, img_noise_gt]
 images_FF     = [pred1,  pred2,  pred3]
-images_SIREN  = [pred1siren, pred2siren, pred3siren]
+images_WIRE  = [pred1siren, pred2siren, pred3siren]
 images_GAUSS = [pred1gaus, pred2gaus, pred3gaus]
-images_WIRE  = [pred1wire, pred2wire, pred3wire]
+images_SIREN  = [pred1wire, pred2wire, pred3wire]
 
 
 methods = ["GT", "FF", "SIREN", "GAUSS", "WIRE"]
@@ -532,14 +622,22 @@ images_methods = [
 
 row_titles = ["Fitting", "Super-resolution", "Denoising"]
 
-fig, axes = plt.subplots(3, 5, figsize=(15, 7))
+if v=="2":
+    fig, axes = plt.subplots(3, 5, figsize=(10, 8))
+else:
+    fig, axes = plt.subplots(3, 5, figsize=(15, 7))
 
 for i in range(3):  # rows = tasks
     gt = images_gt[i]
-
+    if i == 2 and v=="2":
+        gt = np.transpose(gt, (1, 0, 2))
+        
     for j in range(5):  # columns = methods
         ax = axes[i, j]
         im = images_methods[j][i]
+
+        if i == 2 and v=="2":
+            im = np.transpose(im, (1, 0, 2))
 
         H, W, _ = gt.shape
         roi_x, roi_y = 2 * H // 5, 2 * W // 5
@@ -550,36 +648,213 @@ for i in range(3):  # rows = tasks
                 ax,
                 im,
                 roi_x, roi_y, roi_w, roi_h,
+                v,
+                gt=gt,
             )
         else:
             plot_image_with_zoom(
                 ax,
                 im,
                 roi_x, roi_y, roi_w, roi_h,
+                v,
                 gt=gt,
                 show_metrics=True,
             )
 
         if i == 0:
-            ax.set_title(methods[j], fontsize=13)
+            ax.set_title(methods[j], fontsize=f)
 
         if j == 0:
-            ax.set_ylabel(row_titles[i], fontsize=13)
+            ax.set_ylabel(row_titles[i], fontsize=f)
 
-y_positions = [0.81,0.50, 0.17]
+y_positions = [0.81,0.49, 0.17]
 
-for label, y in zip(row_titles, y_positions):
-    fig.text(
-        0.02, y,
-        label,
-        va="center",
-        ha="left",
-        fontsize=13,
-        rotation=90,
-    )
+if v=="2":
+    for label, y in zip(row_titles, y_positions):
+        fig.text(
+            0.018, y,
+            label,
+            va="center",
+            ha="left",
+            fontsize=f,
+            rotation=90,
+        )
+else:
+    for label, y in zip(row_titles, y_positions):
+        fig.text(
+            0.024, y,
+            label,
+            va="center",
+            ha="left",
+            fontsize=f,
+            rotation=90,
+        )
 # =========================
 # FINAL LAYOUT
 # =========================
-plt.tight_layout(rect=[0.03, 0.0, 1.0, 1.0])
-plt.savefig(f"realistic/figs/2fig_1-{v}-{long2}.pdf", bbox_inches="tight")
+fig.subplots_adjust(
+    left=0.04,
+    right=0.995,
+    bottom=0.02,
+    top=0.95,
+    wspace=0.02,
+    hspace=0.02,
+)
+
+plt.savefig(f"realistic/figs/3fig_1-{v}.pdf")
+plt.show()
+
+"""
+def psnr_from_mse(mse, eps=1e-12):
+    #mse = np.maximum(np.array(mse), eps)
+    #return 10.0 * np.log10(1.0 / mse)
+    return mse
+
+def set_log_yticks_minmax(ax, ydata):
+    ymin = np.min(ydata)
+    ymax = np.max(ydata)
+
+    pmin = int(np.floor(np.log10(ymin)))
+    pmax = int(np.ceil(np.log10(ymax)))
+
+    ticks = [10**pmin, 10**pmax]
+    ax.set_yticks(ticks)
+    ax.set_yticklabels([rf"$10^{{{pmin}}}$", rf"$10^{{{pmax}}}$"])
+
+def set_psnr_yticks_minmax(ax, ydata, step=10):
+    ymin = np.min(ydata)
+    ymax = np.max(ydata)
+
+    ymin = step * np.floor(ymin / step)
+    ymax = step * np.ceil(ymax / step)
+
+    ax.set_yticks([ymin, ymax])
+    ax.set_yticklabels([f"{int(ymin)}", f"{int(ymax)}"])
+
+def format_xaxis_endpoints(ax, xmax, off):
+    ax.set_xlim(0, xmax)
+    ax.set_xticks([-off, xmax])
+    ticks = [0, xmax]
+    labels = ax.set_xticklabels([f"{tick:.0f}" for tick in ticks]) 
+    labels[0].set_horizontalalignment("left")
+    labels[-1].set_horizontalalignment("right")
+
+
+dic_fitt_our = load_pickle_pred(f"realistic/2newourFFadamfitting_50000--lr0.001-s152-k1.pickle")
+dic_fitt_optuna = load_pickle_pred(f"realistic/6newoptunaadamFFadamfitting_3000--lr0.001-s107-k3.pickle")
+dic_super_our = load_pickle_pred(f"realistic/6new2ourFFadamsuper_3000--lr0.001-s113-k2.pickle")
+dic_super_optuna = load_pickle_pred(f"realistic/6new2optunaFFadamsuper_3000--lr0.001-s114-k1.pickle")
+dic_noise_optuna = load_pickle_pred(f"realistic/6newouroptunaFFadamnoise3_3000--lr0.001-s67-k3.pickle")
+#5new2noiseFFadamnoise_3000--lr0.001-s39-k1.pickle")
+dic_noise_our = load_pickle_pred(f"realistic/6newouroptunaFFadamnoise3_3000--lr0.001-s49-k3.pickle")
+#5new2noiseFFadamnoise_3000--lr0.001-s35-k1.pickle")
+
+# ---------- Sampling ----------
+step_long  = 10
+step_noise = 3
+max_noise  = 1000
+max_v = 3000
+
+# loss
+fitt_our_psnr     = psnr_from_mse(dic_fitt_our["loss"][:max_v:step_long])
+fitt_opt_psnr     = psnr_from_mse(dic_fitt_optuna["loss"][:max_v:step_long])
+super_our_psnr    = psnr_from_mse(dic_super_our["loss"][:max_v:step_long])
+super_opt_psnr    = psnr_from_mse(dic_super_optuna["loss"][:max_v:step_long])
+noise_our_psnr    = psnr_from_mse(dic_noise_our["loss"][:max_noise:step_noise])
+noise_opt_psnr    = psnr_from_mse(dic_noise_optuna["loss"][:max_noise:step_noise])
+
+# loss_true
+fitt_our_psnr_t     = psnr_from_mse(dic_fitt_our["loss"][:max_v:step_long])
+fitt_opt_psnr_t     = psnr_from_mse(dic_fitt_optuna["loss"][:max_v:step_long])
+super_our_psnr_t  = psnr_from_mse(dic_super_our["loss_true"][1:max_v:step_long])
+super_opt_psnr_t  = psnr_from_mse(dic_super_optuna["loss_true"][1:max_v:step_long])
+noise_our_psnr_t  = psnr_from_mse(dic_noise_our["loss_true"][1:max_noise:step_noise])
+noise_opt_psnr_t  = psnr_from_mse(dic_noise_optuna["loss_true"][1:max_noise:step_noise])
+
+print (len(fitt_our_psnr), len(fitt_opt_psnr), len(super_our_psnr), len(super_opt_psnr), len(noise_our_psnr), len(noise_opt_psnr))
+print (len(fitt_our_psnr_t), len(fitt_opt_psnr_t), len(super_our_psnr_t), len(super_opt_psnr_t), len(noise_our_psnr_t), len(noise_opt_psnr_t))
+
+# ---------- Plot 1: training loss ----------
+fig, axes = plt.subplots(1, 3, figsize=(13, 4))
+
+# ----- fitting -----
+x_fit = np.arange(len(fitt_our_psnr)) * step_long
+axes[0].plot(x_fit, fitt_our_psnr, label="Ours")
+axes[0].plot(x_fit, fitt_opt_psnr, label="Optuna")
+axes[0].set_title("Fitting")
+axes[0].set_ylabel("Training Loss", labelpad=-35)
+axes[0].set_yscale("log")
+#axes[0].margins(x=0.1)
+set_log_yticks_minmax(axes[0], np.r_[fitt_our_psnr, fitt_opt_psnr])
+
+# ----- super-resolution -----
+x_sup = np.arange(len(super_our_psnr)) * step_long
+axes[1].plot(x_sup, super_our_psnr, label="Ours")
+axes[1].plot(x_sup, super_opt_psnr, label="Optuna")
+axes[1].set_title("Super-resolution")
+axes[1].set_yscale("log")
+set_log_yticks_minmax(axes[1], np.r_[super_our_psnr, super_opt_psnr])
+
+# ----- noise -----
+x_noise = np.arange(len(noise_our_psnr)) * step_noise
+axes[2].plot(x_noise, noise_our_psnr, label="Ours")
+axes[2].plot(x_noise, noise_opt_psnr, label="Optuna")
+axes[2].set_title("Noise")
+axes[2].set_yscale("log")
+set_log_yticks_minmax(axes[2], np.r_[noise_our_psnr, noise_opt_psnr])
+
+for ax in axes:
+    ax.set_xlabel("iterations", labelpad=-15)
+    ax.grid(True)
+
+format_xaxis_endpoints(axes[0], max_v, 20)
+format_xaxis_endpoints(axes[1], max_v, 20)
+format_xaxis_endpoints(axes[2], max_noise,5)
+
+axes[2].legend()
+plt.tight_layout()
+plt.savefig(f"realistic/figs/dynamicOurVSoptuna_train.pdf")
+plt.show()
+
+
+# ---------- Plot 2: true loss ----------
+fig, axes = plt.subplots(1, 3, figsize=(13, 4))
+
+# ----- fitting (true) -----
+x_fit = np.arange(len(fitt_our_psnr_t)) * step_long
+axes[0].plot(x_fit, fitt_our_psnr_t, label="Ours")
+axes[0].plot(x_fit, fitt_opt_psnr_t, label="Optuna")
+axes[0].set_title("Fitting")
+axes[0].set_ylabel("Test Loss", labelpad=-35)
+axes[0].set_yscale("log")
+set_log_yticks_minmax(axes[0], np.r_[fitt_our_psnr_t, fitt_opt_psnr_t])
+
+# ----- super-resolution (true) -----
+x_sup = np.arange(len(super_our_psnr_t))*10
+axes[1].plot(x_sup, super_our_psnr_t, label="Ours")
+axes[1].plot(x_sup, super_opt_psnr_t, label="Optuna")
+axes[1].set_title("Super-resolution")
+axes[1].set_yscale("log")
+set_log_yticks_minmax(axes[1], np.r_[super_our_psnr_t, super_opt_psnr_t])
+
+# ----- noise (true) -----
+x_noise = np.arange(len(noise_our_psnr_t))* step_noise
+axes[2].plot(x_noise, noise_our_psnr_t, label="Ours")
+axes[2].plot(x_noise, noise_opt_psnr_t, label="Optuna")
+axes[2].set_title("Noise")
+axes[2].set_yscale("log")
+set_log_yticks_minmax(axes[2], np.r_[noise_our_psnr_t, noise_opt_psnr_t])
+
+for ax in axes:
+    ax.set_xlabel("iterations", labelpad=-15)
+    ax.grid(True)
+format_xaxis_endpoints(axes[0], max_v, 20)
+format_xaxis_endpoints(axes[1], max_v, 20)
+format_xaxis_endpoints(axes[2], max_noise,5)
+
+
+
+axes[2].legend()
+plt.tight_layout()
+plt.savefig(f"realistic/figs/dynamicOurVSoptuna_test.pdf")
 plt.show()

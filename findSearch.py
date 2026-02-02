@@ -12,6 +12,7 @@ import pickle
 import jax
 import os
 import optax
+import jax.lax as lax
 #os.environ['XLA_FLAGS'] = '--xla_gpu_autotune_level=0'
 #jax.config.update("jax_default_matmul_precision", "high")
 
@@ -254,7 +255,21 @@ def Gaussian_forward(X, params, alpha):
 
 
 def train_model_record_adam(forward, params, X, Y, X_true, Y_true, nIter, lr, ej, *args):
-    optimizer = optax.adam(learning_rate=lr)
+    print (ej)
+    if ej in ["noise", "noise2","noise3"]:
+        n1 = 1
+        n2 = 3000
+        nIter = 3000
+    else:
+        n1 = 100
+        n2 = 10000
+        nIter = 50000
+
+    #schedule = optax.linear_schedule(init_value=lr, end_value=0.1 * lr, transition_steps=nIter)
+    #schedule = optax.cosine_decay_schedule(init_value=lr, decay_steps=nIter, alpha=0.1)
+    #schedule = optax.exponential_decay(init_value=lr, transition_steps=nIter, decay_rate=0.1, staircase=True)
+    schedule = lr
+    optimizer = optax.adam(learning_rate=schedule)
     opt_state = optimizer.init(params)
 
     def loss_fn(p):
@@ -263,6 +278,7 @@ def train_model_record_adam(forward, params, X, Y, X_true, Y_true, nIter, lr, ej
     loss_history = []
     loss_true_history = [0]
     params_list = []
+    Y_preds = []
 
     @jit
     def step(params, opt_state):
@@ -275,21 +291,22 @@ def train_model_record_adam(forward, params, X, Y, X_true, Y_true, nIter, lr, ej
         params, opt_state, loss = step(params, opt_state)
         loss_history.append(loss)
         
-        if it % 100 == 0:
+        if (it % n1 == 0 or it == nIter - 1):
+            #Y_preds.append(forward(X, params, *args))   
             if (ej != "fitting" and ej != "fitting2" and ej != "fitting3"):
                 loss_true = loss_fn_true_streaming(forward, params, X_true, Y_true, *args)
                 loss_true_history.append(loss_true)
             print(f"Iter {it}: loss={loss:.4e}, true loss={loss_true_history[-1]:.4e}")
-        if it % 10000 == 0 and (ej != "fitting" and ej != "fitting2" and ej != "fitting3"):
+        if it % n2 == 0 and (ej != "fitting" and ej != "fitting2" and ej != "fitting3"):
             params_list.append(params)
+            Y_preds.append(forward(X, params, *args))
 
-    Y_pred = forward(X, params, *args)
+    Y_preds.append(forward(X, params, *args))
     params_list.append(params)
 
-    return params_list, jnp.array(loss_history), jnp.array(loss_true_history), Y_pred
+    return params_list, jnp.array(loss_history), jnp.array(loss_true_history), Y_preds
 
-
-def train_model_record(forward, params, X, Y, nIter, lr, ej, *args):
+def train_model(forward, params, X, Y, nIter, lr, ej, *args):
 
     optimizer = optax.sgd(learning_rate=lr)
     opt_state = optimizer.init(params)
@@ -317,7 +334,7 @@ def train_model_record(forward, params, X, Y, nIter, lr, ej, *args):
             print(f"Iter {it}: loss={loss:.4e}")
 
     Y_pred = forward(X, params, *args)
-    #Y_preds.append(Y_pred)
+    Y_preds.append(Y_pred)
 
     #np.save(f"realistic/short-{ej}-lr{lr}-sigmaW{sigma}.npy", np.array(Y_preds))
 
@@ -510,16 +527,16 @@ if __name__ == "__main__":
         
         k = 4
         key = random.PRNGKey(k)
-        nIter_long = 5000
+        nIter_long = 100
 
         if ej == "fitting":
             #sigma = 84 #optuna
-            sigma = 112 #102 #our
+            sigma = 79 #112 #102 #our
         if ej == "super":
             sigma = 43.3 #optuna full #42 optuna
             #sigma = 56.7 # no full- 110 #our full
         if ej == "noise":
-            sigma = 78 #
+            sigma = 39#78 #
             #sigma = 121 #69 #our
         if ej == "fitting2":
             sigma = 44
@@ -528,7 +545,7 @@ if __name__ == "__main__":
             sigma = 46
             #sigma = 56.7
         if ej == "noise2":
-            sigma = 38
+            sigma = 28 #38
             #sigma = 69
         if ej == "fitting3":
             #sigma = 84
@@ -537,7 +554,7 @@ if __name__ == "__main__":
             #sigma = 42
             sigma = 79
         if ej == "noise3":
-            sigma = 49
+            sigma = 28 #49
             #sigma = 69
         lr = 1e-1
         #sigma = 50
@@ -547,8 +564,8 @@ if __name__ == "__main__":
         layers_FF = [2, 500, 200, 3] 
         params = init_FF_params(layers_FF, key, sigma)
 
-        params_ff, loss_hist, loss_true_hist, Y_pred = train_model(
-            FF_forward, params, X, Y, X_true, Y_true,nIter_long, lr, ej)
+        params_ff, loss_hist, Y_pred = train_model(
+            FF_forward, params, X, Y, nIter_long, lr, ej)
 
         elapsed = time.time() - start
         print("Elapsed time (s):", elapsed)
@@ -566,7 +583,7 @@ if __name__ == "__main__":
         plt.figure(figsize=(15,4))
         plt.subplot(1,4,1)
         plt.semilogy(loss_hist)
-        plt.semilogy(loss_true_hist, color="red")
+        #plt.semilogy(loss_true_hist, color="red")
         plt.xlabel("Iteration")
         plt.title(f"training loss, sig={sigma}")
         plt.grid(True)
@@ -694,7 +711,7 @@ if __name__ == "__main__":
     if objective == "multiFFadam":
         start = time.time()
         
-        nIter_long = 500
+        nIter_long = 3000
         lr = 1e-3
         layers_FF = [2, 2000, 200, 3] 
         k = 10
@@ -707,19 +724,25 @@ if __name__ == "__main__":
             L = [("noise", 137),
             ("super2",114)] #our
 
-        L = [("noise", 137), ("noise2", 89), ("noise3", 91)]#[("noise", 73), ("noise2", 44), ("noise3", 46)]
+        #L = [("noise", 137), ("noise2", 89), ("noise3", 91)]#[("noise", 39), ("noise2", 28), ("noise3", 28)] #
+        #L = [("super",43), ("super2", 46), ("super3",79)] #
+        #L = [("fitting", 79), ("fitting2", 44), ("fitting3",67)] # [("fitting", 152), ("fitting2", 97), ("fitting3",119)]
+        #L = [("fitting", 152), ("fitting2", 97), ("fitting3",119)]
+        #L = [("super",113), ("fitting",79)]#[("super",114), ("super",43)]
+        #L = [("fitting", 152)]
+        L = [("noise3", 40), ("noise3", 49), ("noise3", 67)]
         for ex, sigma in L:
-            k=+1
-
+            k=+3
 
             img, imgTrue = load_image(ex)    
             X, Y = make_image_dataset(img)
+            X_true, Y_true = make_image_dataset(imgTrue)
 
             key = random.PRNGKey(k)
             params = init_FF_params(layers_FF, key, sigma)
 
-            params_ff, loss_hist, Y_pred = train_model_record_adam(
-                FF_forward, params, X, Y, nIter_long, lr, ex)
+            params_ff, loss_hist, loss_true_hist, Y_pred = train_model_record_adam(
+                FF_forward, params, X, Y, X_true, Y_true, nIter_long, lr, ex)
 
             elapsed = time.time() - start
             print("Elapsed time (s):", elapsed)
@@ -727,9 +750,11 @@ if __name__ == "__main__":
             dic = {}
             dic["param"] = params_ff
             dic["loss"] = loss_hist
+            dic["loss_true"] = loss_true_hist
             dic["pred"] = Y_pred
 
-            
+            if type(Y_pred) is list:
+                Y_pred = Y_pred[-1]
             H, W, _ = img.shape
             img_pred = Y_pred.reshape(H, W, 3)
             img_pred = jnp.clip(img_pred, 0.0, 1.0)
@@ -757,17 +782,15 @@ if __name__ == "__main__":
             plt.title("Error")
             plt.axis("off")
             if save == "yes":
-                plt.savefig(f'realistic/new2{ej}FFadam{ex}_{nIter_long}-lr{lr}-s{sigma}.pdf', bbox_inches='tight')
-                with open(f"realistic/new2{ej}FFadam{ex}_{nIter_long}--lr{lr}-s{sigma}-k{k}.pickle", "wb") as file:
+                plt.savefig(f'realistic/6new{ej}FFadam{ex}_{nIter_long}-lr{lr}-s{sigma}.pdf', bbox_inches='tight')
+                with open(f"realistic/6new{ej}FFadam{ex}_{nIter_long}--lr{lr}-s{sigma}-k{k}.pickle", "wb") as file:
                     pickle.dump(dic, file, protocol=pickle.HIGHEST_PROTOCOL)
                 plt.close()
             else:
                 plt.show()
             
 
-    if objective == "visualSIREN":
-
-        
+    if objective == "visualSIREN":    
         layers_SIREN = [2, 512, 512, 512, 3]
         k = 100
         nIter_long = 50000
@@ -784,6 +807,8 @@ if __name__ == "__main__":
         if ej == "ej3":
             L = [("fitting3", 97), ("super3",122), ("noise3", 89), ("fitting", 112)]
         #L = [("noise", 121), ("noise2", 89), ("noise3", 91)]
+        L = [("fitting", 112)]
+
         for ex, _ in L:
             img, imgTrue = load_image(ex)    
             X, Y = make_image_dataset(img)
@@ -799,6 +824,10 @@ if __name__ == "__main__":
             dic["loss"] = loss_hist
             dic["loss_true"] = loss_true_hist
             dic["pred"] = Y_pred
+
+            if type(Y_pred) is list:
+                Y_pred = Y_pred[-1]
+            
 
             H, W, _ = img.shape
             img_pred = Y_pred.reshape(H, W, 3)
@@ -827,8 +856,8 @@ if __name__ == "__main__":
             plt.title("Error")
             plt.axis("off")
             if save == "yes":
-                plt.savefig(f'realistic/2SIREN_adam{ex}_{nIter_long}-lr{lr}-w0{w0}.pdf', bbox_inches='tight')
-                with open(f"realistic/2SIREN_adam{ex}_{nIter_long}--lr{lr}-w0{w0}-k{k}.pickle", "wb") as file:
+                plt.savefig(f'realistic/linearSIREN_adam{ex}_{nIter_long}-lr{lr}-w0{w0}.pdf', bbox_inches='tight')
+                with open(f"realistic/linearSIREN_adam{ex}_{nIter_long}--lr{lr}-w0{w0}-k{k}.pickle", "wb") as file:
                     pickle.dump(dic, file, protocol=pickle.HIGHEST_PROTOCOL)
                 plt.close()
             else:
@@ -848,7 +877,7 @@ if __name__ == "__main__":
         if ej == "ej3":
             L = [("fitting3", 97), ("super3",122), ("noise3", 89), ("fitting", 112)]
 
-        #L = [("noise", 121), ("noise2", 89), ("noise3", 91)]
+        L = [("fitting", 112)]#[("noise", 121), ("noise2", 89), ("noise3", 91)]
 
         for ex, _ in L:
             img, imgTrue = load_image(ex)    
@@ -866,6 +895,9 @@ if __name__ == "__main__":
             dic["loss"] = loss_hist
             dic["loss_true"] = loss_true_hist
             dic["pred"] = Y_pred
+            
+            if type(Y_pred) is list:
+                Y_pred = Y_pred[-1]
             
             H, W, _ = img.shape
             img_pred = Y_pred.reshape(H, W, 3)
@@ -894,8 +926,8 @@ if __name__ == "__main__":
             plt.title("Error")
             plt.axis("off")
             if save == "yes":
-                plt.savefig(f'realistic/2Gauss_adam{ex}_{nIter_long}-lr{lr}-a{alpha}.pdf', bbox_inches='tight')
-                with open(f"realistic/2Gauss_adam{ex}_{nIter_long}--lr{lr}-a{alpha}-k{k}.pickle", "wb") as file:
+                plt.savefig(f'realistic/linearGauss_adam{ex}_{nIter_long}-lr{lr}-a{alpha}.pdf', bbox_inches='tight')
+                with open(f"realistic/linearGauss_adam{ex}_{nIter_long}--lr{lr}-a{alpha}-k{k}.pickle", "wb") as file:
                     pickle.dump(dic, file, protocol=pickle.HIGHEST_PROTOCOL)
                 plt.close()
             else:
@@ -919,6 +951,7 @@ if __name__ == "__main__":
             L = [("fitting3", 97), ("super3",122), ("noise3", 89), ("fitting", 112)]
 
         #L = [("noise", 121), ("noise2", 89), ("noise3", 91)]
+        L = [("fitting", 112)]
 
         for ex, _ in L:
             img, imgTrue = load_image(ex)    
@@ -939,7 +972,8 @@ if __name__ == "__main__":
             dic["loss_true"] = loss_true_hist
             dic["pred"] = Y_pred
 
-            
+            if type(Y_pred) is list:
+                Y_pred = Y_pred[-1]
             H, W, _ = img.shape
             img_pred = Y_pred.reshape(H, W, 3)
             img_pred = jnp.clip(img_pred, 0.0, 1.0)
@@ -967,8 +1001,8 @@ if __name__ == "__main__":
             plt.title("Error")
             plt.axis("off")
             if save == "yes":
-                plt.savefig(f'realistic/2WIRE_adam{ex}_{nIter_long}-lr{lr}-s0{sigma0}.pdf', bbox_inches='tight')
-                with open(f"realistic/2WIRE_adam{ex}_{nIter_long}--lr{lr}-s0{sigma0}-k{k}.pickle", "wb") as file:
+                plt.savefig(f'realistic/linearWIRE_adam{ex}_{nIter_long}-lr{lr}-s0{sigma0}.pdf', bbox_inches='tight')
+                with open(f"realistic/linearWIRE_adam{ex}_{nIter_long}--lr{lr}-s0{sigma0}-k{k}.pickle", "wb") as file:
                     pickle.dump(dic, file, protocol=pickle.HIGHEST_PROTOCOL)
                 plt.close()
             else:

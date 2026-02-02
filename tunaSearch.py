@@ -152,79 +152,9 @@ def Gaussian_forward(X, params, alpha):
 
     return jnp.matmul(H, Ws[-1])+ bs[-1]
 
-def train_model(forward, params, X, Y, X_true, Y_true, nIter, lr, *args):
-    opt_init, opt_update, get_params = optimizers.sgd(lr)
-    opt_state = opt_init(params)
-
-    def loss_fn(p):
-        return jnp.mean((forward(X, p, *args) - Y) ** 2)
-
-    loss_history = []
-
-    @jit
-    def step(opt_state):
-        params = get_params(opt_state)
-        loss, grads = value_and_grad(loss_fn)(params)
-        opt_state = opt_update(0, grads, opt_state)
-        return opt_state, loss
-
-    for _ in range(nIter):
-        opt_state, loss = step(opt_state)
-        loss_history.append(loss)
-
-    final_params = get_params(opt_state)
-
-    loss_true = loss_fn_true_streaming(
-        forward,
-        final_params,
-        X_true,
-        Y_true,
-        chunk_size=4096,   # increase/decrease depending on GPU/CPU memory
-        *args
-    )
-
-    Y_pred = forward(X, final_params, *args)
-
-    return final_params, jnp.array(loss_history), loss_true, Y_pred
-
-
-def train_model_adam(forward, params, X, Y, X_true, Y_true, nIter, lr, *args):
-    opt_init, opt_update, get_params = optimizers.adam(lr)
-    opt_state = opt_init(params)
-
-    def loss_fn(p):
-        return jnp.mean((forward(X, p, *args) - Y) ** 2)
-
-    loss_history = []
-
-    @jit
-    def step(opt_state):
-        params = get_params(opt_state)
-        loss, grads = value_and_grad(loss_fn)(params)
-        opt_state = opt_update(0, grads, opt_state)
-        return opt_state, loss
-
-    for _ in range(nIter):
-        opt_state, loss = step(opt_state)
-        loss_history.append(loss)
-
-    final_params = get_params(opt_state)
-    
-    loss_true = loss_fn_true_streaming(
-        forward,
-        final_params,
-        X_true,
-        Y_true,
-        chunk_size=4096,   # increase/decrease depending on GPU/CPU memory
-        *args
-    )
-
-    Y_pred = forward(X, final_params, *args)
-
-    return final_params, jnp.array(loss_history), loss_true, Y_pred
 
 def train_model_adam_noise(forward, params, X, Y, X_true, Y_true, nIter, lr, *args):
-    opt_init, opt_update, get_params = optimizers.sgd(lr)
+    opt_init, opt_update, get_params = optimizers.adam(lr)
     opt_state = opt_init(params)
 
     def loss_fn(p):
@@ -257,9 +187,9 @@ def train_model_adam_noise(forward, params, X, Y, X_true, Y_true, nIter, lr, *ar
 
 
 def objective_FFadam_noise(trial):
-    sigma = trial.suggest_float("sigma", 1.0, 100.0, log=True)
+    sigma = trial.suggest_float("sigma", 1.0, 200.0, log=True)
 
-    lr = 1e-1
+    lr = 1e-3
     nIter = 1000           
     layers_FF = [2, 2000, 200, 3]
 
@@ -276,11 +206,37 @@ def objective_FFadam_noise(trial):
 
     return final_loss
 
+def train_model(forward, params, X, Y, X_true, Y_true, nIter, lr, *args):
+    opt_init, opt_update, get_params = optimizers.sgd(lr)
+    opt_state = opt_init(params)
+
+    def loss_fn(p):
+        return jnp.mean((forward(X, p, *args) - Y) ** 2)
+
+    loss_history = []
+
+    @jit
+    def step(opt_state):
+        params = get_params(opt_state)
+        loss, grads = value_and_grad(loss_fn)(params)
+        opt_state = opt_update(0, grads, opt_state)
+        return opt_state, loss
+
+    for _ in range(nIter):
+        opt_state, loss = step(opt_state)
+        loss_history.append(loss)
+
+    final_params = get_params(opt_state)
+    loss_true = loss_fn_true_streaming(forward, final_params, X_true, Y_true, chunk_size=4096, *args)
+    Y_pred = forward(X, final_params, *args)
+
+    return final_params, jnp.array(loss_history), loss_true, Y_pred
+
 def objective_FF(trial):
-    sigma = trial.suggest_float("sigma", 30.0, 150.0, log=True)
+    sigma = trial.suggest_float("sigma", 1.0, 200.0, log=True)
 
     lr = 1e-1
-    nIter = 5000           
+    nIter = 1000           
     layers_FF = [2, 2000, 200, 3]
 
     # ---- PRNG handling (DO NOT reuse keys) ----
@@ -292,15 +248,41 @@ def objective_FF(trial):
         FF_forward, params, X, Y, X_true, Y_true, nIter, lr)
 
     # ---- objective value ----
-    final_loss = float(loss_true)
+    final_loss = float(jnp.min(loss_hist[-1]))
 
     return final_loss
 
-def objective_FFadam(trial):
-    sigma = trial.suggest_float("sigma", 50.0, 300.0, log=True)
+def train_model_adam(forward, params, X, Y, X_true, Y_true, nIter, lr, *args):
+    opt_init, opt_update, get_params = optimizers.sgd(lr)
+    opt_state = opt_init(params)
 
-    lr = 1e-3
-    nIter = 5000           
+    def loss_fn(p):
+        return jnp.mean((forward(X, p, *args) - Y) ** 2)
+
+    loss_history = []
+
+    @jit
+    def step(opt_state):
+        params = get_params(opt_state)
+        loss, grads = value_and_grad(loss_fn)(params)
+        opt_state = opt_update(0, grads, opt_state)
+        return opt_state, loss
+
+    for _ in range(nIter):
+        opt_state, loss = step(opt_state)
+        loss_history.append(loss)
+
+    final_params = get_params(opt_state)
+    loss_true = loss_fn_true_streaming(forward, final_params, X_true, Y_true, chunk_size=4096, *args)
+    Y_pred = forward(X, final_params, *args)
+
+    return final_params, jnp.array(loss_history), loss_true, Y_pred
+
+def objective_FFadam(trial):
+    sigma = trial.suggest_float("sigma", 1.0, 200.0, log=True)
+
+    lr = 1e-1
+    nIter = 1000           
     layers_FF = [2, 2000, 200, 3]
 
     # ---- PRNG handling (DO NOT reuse keys) ----
@@ -381,19 +363,21 @@ if __name__ == "__main__":
 
     if mode == "FFsgd":
         all_results = []
-        if ej == "ej1":
-            lis = ["fitting" ] #, "fitting", 
-        if ej == "ej2":
-            lis = ["super2", "noise2"] #, "fitting2", 
-        if ej == "ej3":
-            lis = ["super3","noise3"] #"fitting3",  
+        if ej == "fit":
+            lis = ["fitting", "fitting2", "fitting3"] #, "fitting", 
+        if ej == "sup":
+            lis = ["super", "super2", "super3"] #, 
+        if ej == "noi":
+            lis = ["noise", "noise2","noise3"] #"fitting3",   
+        #lis = ["noise", "noise2", "noise3" ]
         for ex in lis:
-            if ex == "fitting" or ex == "fitting2" or ex == "fitting3":
-                k = 0
-            elif ex == "super" or ex == "super2" or ex == "super3":
-                k = 1
-            elif ex == "noise" or ex == "noise2" or ex == "noise3":
-                k = 2
+            if ex == "fitting":
+                k = 10
+            elif ex == "super":
+                k = 20
+            elif ex == "noise":
+                k = 30
+            k=+1
 
             img, imgTrue = load_image(ex)
         
@@ -457,26 +441,28 @@ if __name__ == "__main__":
         )
         lines.append("\\end{table}")
 
-        filename = f"realistic/fittingtrue_{ej}tuna_{mode}_trial20_lr0.1.tex"
+        filename = f"realistic/Notrue1000SGD_{ej}tuna_{mode}_trial20_lr0.1.tex"
         with open(filename, "w") as f:
             f.write("\n".join(lines))
 
     if mode == "FFadam":
         all_results = []
-        if ej == "ej1":
-            lis = ["super","noise" ] #, "fitting", 
-        if ej == "ej2":
-            lis = ["super2", "noise2"] #, "fitting2", 
-        if ej == "ej3":
-            lis = ["super3","noise3"] #"fitting3",  
+        if ej == "fit":
+            lis = ["fitting", "fitting2", "fitting3"] #, "fitting", 
+        if ej == "sup":
+            lis = ["super", "super2", "super3"] #, 
+        if ej == "noi":
+            lis = ["noise", "noise2","noise3"] #"fitting3",  
         #lis = ["noise", "noise2", "noise3" ]
+        #lis = ["fitting" ] #, "fitting",
         for ex in lis:
-            if ex == "fitting" or ex == "fitting2" or ex == "fitting3":
-                k = 0
-            elif ex == "super" or ex == "super2" or ex == "super3":
-                k = 1
-            elif ex == "noise" or ex == "noise2" or ex == "noise3":
-                k = 2
+            if ex == "fitting":
+                k = 10
+            elif ex == "super":
+                k = 20
+            elif ex == "noise":
+                k = 30
+            k=+1
 
             img, imgTrue = load_image(ex)
         
@@ -540,13 +526,13 @@ if __name__ == "__main__":
         )
         lines.append("\\end{table}")
 
-        filename = f"realistic/true_{ej}tuna_{mode}_trial20_lr0.001.tex"
+        filename = f"realistic/True1000SGD_{ej}tuna_{mode}_trial20_lr0.001.tex"
         with open(filename, "w") as f:
             f.write("\n".join(lines))
 
     if mode == "FFadamnoise":
         all_results = []
-        lis = ["noise", "noise2", "noise3" ]
+        lis = ["fitting"]#["noise", "noise2", "noise3" ]
         for ex in lis:
             if ex == "fitting" or ex == "fitting2" or ex == "fitting3":
                 k = 10
@@ -617,7 +603,7 @@ if __name__ == "__main__":
         )
         lines.append("\\end{table}")
 
-        filename = f"realistic/1000sgdtrue_{ej}tuna_{mode}_trial20_lr0.1.tex"
+        filename = f"realistic/1000adamtrue_{ej}tuna_{mode}_trial20_lr0.001.tex"
         with open(filename, "w") as f:
             f.write("\n".join(lines))
 

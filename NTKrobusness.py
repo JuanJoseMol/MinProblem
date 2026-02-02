@@ -129,7 +129,7 @@ plt.show()
 """
 
 
-fig, axs = plt.subplots(1, 3, figsize=(8, 3))
+fig, axs = plt.subplots(1, 3, figsize=(13, 4))
 
 for i, t in enumerate(["100", "200", "200-4capas"]):
     for j, w in enumerate(["30","90","180","300"]):
@@ -139,7 +139,7 @@ for i, t in enumerate(["100", "200", "200-4capas"]):
         axs[i].plot(np.linspace(0,60,120), u, color = colors[j], label = '$\sigma_w$ = '+w+'$/2\pi$') 
 
     axs[i].plot([0 for i in range(120)], color = "black")
-    axs[i].set_xlabel('$\\xi$', labelpad=-15, fontsize=12)
+    axs[i].set_xlabel('$\\xi$', labelpad=-15, fontsize=19)
 
     axs[i].set_xticks([0,60])
     axs[i].set_xlim([0,60])
@@ -167,7 +167,7 @@ for i, t in enumerate(["100", "200", "200-4capas"]):
     # Get tick positions and labels
     ticks = axs[i].get_yticks()
     #ticks = [-1, 6]
-    labels = axs[i].set_yticklabels([f"{tick:.1f}" for tick in ticks],fontsize=12)  # Set custom tick labels
+    labels = axs[i].set_yticklabels([f"{tick:.1f}" for tick in ticks],fontsize=19)  # Set custom tick labels
     
 
     # Adjust alignment of the first and last ticks
@@ -175,20 +175,20 @@ for i, t in enumerate(["100", "200", "200-4capas"]):
     labels[-1].set_verticalalignment("top")
     
 
-axs[0].set_title('2-layers, m = 100', fontsize=12)
-axs[1].set_title('2-layers, m = 200', fontsize=12)
-#axs[2].set_title('2-layers, m = 500', fontsize=12)
-axs[2].set_title('4-layers, [1,2000,200,200,1]', fontsize=12)
+axs[0].set_title('2-layers, m = 100', fontsize=19)
+axs[1].set_title('2-layers, m = 200', fontsize=19)
+#axs[2].set_title('2-layers, m = 500', fontsize=19)
+axs[2].set_title('4-layers, [1,2000,200,200,1]', fontsize=19)
 #axs[0].set_yticks([-1,5])
 
 
-axs[0].set_ylabel('FLR', labelpad=-25, fontsize=12)
+axs[0].set_ylabel('FLR', labelpad=-35, fontsize=19)
 
 
 
 
 
-axs[2].legend(frameon=False,loc='upper right',fontsize=10)
+axs[2].legend(frameon=False,loc='upper right',fontsize=15)
 
 
 plt.tight_layout()
